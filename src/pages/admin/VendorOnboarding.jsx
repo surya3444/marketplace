@@ -8,7 +8,7 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
 const VendorOnboarding = () => {
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState([]); // Array to store multiple files
   
   // Form State
   const [formData, setFormData] = useState({
@@ -26,10 +26,17 @@ const VendorOnboarding = () => {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   
+  // UPDATED: Handle Multiple File Selection (Append instead of replace)
   const handleFileChange = (e) => {
-    if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setFiles((prevFiles) => [...prevFiles, ...newFiles]);
     }
+  };
+
+  // NEW: Remove a file from the list
+  const removeFile = (indexToRemove) => {
+    setFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
   };
 
   const handleOnboard = async (e) => {
@@ -59,6 +66,7 @@ const VendorOnboarding = () => {
         // --- 3. Upload Documents (Using Main App Storage) ---
         const docUrls = [];
         for (const file of files) {
+            // Upload each file to a unique path
             const storageRef = ref(storage, `vendors/${uid}/documents/${file.name}`);
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
@@ -187,32 +195,65 @@ const VendorOnboarding = () => {
 
             <hr className="border-gray-200 dark:border-white/10" />
 
-            {/* --- Section 3: Documents --- */}
+            {/* --- Section 3: Documents (UPDATED) --- */}
             <div>
                 <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
                     <i className="fas fa-file-upload"></i> Documents
                 </h3>
-                <div className="border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition cursor-pointer relative group">
-                    <input type="file" multiple onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                
+                {/* File Drop Zone */}
+                <div className="border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition relative group">
+                    {/* Input now has 'multiple' attribute explicitly */}
+                    <input 
+                        type="file" 
+                        multiple 
+                        onChange={handleFileChange} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                    />
                     
-                    <div className="flex flex-col items-center justify-center transition-transform group-hover:scale-105 duration-300">
+                    <div className="flex flex-col items-center justify-center transition-transform group-hover:scale-105 duration-300 pointer-events-none">
                         <i className="fas fa-cloud-upload-alt text-5xl text-primary/50 mb-3 group-hover:text-primary transition-colors"></i>
-                        <p className="text-gray-700 dark:text-gray-300 font-bold text-lg">Drag & Drop or Click to Upload</p>
-                        <p className="text-xs text-gray-400 mt-1">Supports PDF, JPG, PNG</p>
+                        <p className="text-gray-700 dark:text-gray-300 font-bold text-lg">
+                            Click to Upload Multiple Files
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">Supports PDF, JPG, PNG (Max 5MB)</p>
                     </div>
                 </div>
                 
+                {/* Selected Files List */}
                 {files.length > 0 && (
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {files.map((f, i) => (
-                            <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg">
-                                <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
-                                    <i className="fas fa-file"></i>
+                    <div className="mt-4 space-y-2">
+                        <p className="text-sm font-bold text-gray-500 mb-2">Selected Documents ({files.length})</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {files.map((file, index) => (
+                                <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg shadow-sm">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="w-10 h-10 rounded bg-blue-50 dark:bg-blue-900/20 flex-shrink-0 flex items-center justify-center text-primary">
+                                            {/* Icon based on file type */}
+                                            {file.type.includes('image') ? <i className="fas fa-image"></i> : <i className="fas fa-file-pdf"></i>}
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate block">
+                                                {file.name}
+                                            </span>
+                                            <span className="text-xs text-gray-400">
+                                                {(file.size / 1024).toFixed(1)} KB
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Remove Button */}
+                                    <button 
+                                        type="button"
+                                        onClick={() => removeFile(index)}
+                                        className="text-red-400 hover:text-red-600 p-2 transition hover:bg-red-50 rounded-full"
+                                        title="Remove file"
+                                    >
+                                        <i className="fas fa-times"></i>
+                                    </button>
                                 </div>
-                                <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{f.name}</span>
-                                <span className="ml-auto text-xs text-gray-400">{(f.size / 1024).toFixed(1)} KB</span>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>

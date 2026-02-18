@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { collection, query, orderBy, limit, getDocs, startAfter, where } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, startAfter, where, doc, getDoc } from "firebase/firestore";
 
 // --- SUB-COMPONENT: LIFECYCLE MODAL (Drill Down) ---
 const LifecycleModal = ({ type, id, name, onClose }) => {
@@ -10,8 +10,9 @@ const LifecycleModal = ({ type, id, name, onClose }) => {
 
   useEffect(() => {
     const fetchLifecycle = async () => {
-      // Query specific to the actor (Vendor or Customer)
-      const field = type === "vendor" ? "vendorId" : "customerName"; // Using Name for customer for demo (UID is better in prod)
+      // Query specific to the actor (Vendor ID or Customer Name)
+      // Note: In a real app, customer should also be an ID, but we use Name as requested
+      const field = type === "vendor" ? "vendorId" : "customerName"; 
       const q = query(collection(db, "orders"), where(field, "==", id), orderBy("createdAt", "desc"));
       
       const snap = await getDocs(q);
@@ -19,9 +20,9 @@ const LifecycleModal = ({ type, id, name, onClose }) => {
       
       // Calculate Deep Metrics
       const total = data.length;
-      const accepted = data.filter(o => o.status === 'accepted' || o.status === 'shipped').length;
-      const totalMoney = data.reduce((acc, curr) => acc + (curr.status !== 'rejected' ? curr.totalAmount : 0), 0);
-      const lostMoney = data.reduce((acc, curr) => acc + (curr.status === 'rejected' ? curr.totalAmount : 0), 0);
+      const accepted = data.filter(o => o.status === 'accepted' || o.status === 'shipped' || o.status === 'delivered').length;
+      const totalMoney = data.reduce((acc, curr) => acc + (curr.status !== 'rejected' && curr.status !== 'cancelled' ? curr.totalAmount : 0), 0);
+      const lostMoney = data.reduce((acc, curr) => acc + (curr.status === 'rejected' || curr.status === 'cancelled' ? curr.totalAmount : 0), 0);
 
       setMetrics({
         totalVal: totalMoney,
@@ -73,7 +74,7 @@ const LifecycleModal = ({ type, id, name, onClose }) => {
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-black/20">
            {loading ? <div className="text-center py-10">Loading Lifecycle...</div> : (
              <div className="relative border-l-2 border-gray-200 dark:border-white/10 ml-4 space-y-8">
-                {history.map((order, idx) => (
+                {history.map((order) => (
                     <div key={order.id} className="relative pl-8">
                         {/* Timeline Dot */}
                         <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${
@@ -94,14 +95,29 @@ const LifecycleModal = ({ type, id, name, onClose }) => {
                                 <span className="font-bold font-mono dark:text-white">#{order.id.slice(0,6)}</span>
                             </div>
                             
-                            <div className="flex justify-between items-end">
+                            {/* NEW: Show Customer Name here if looking at Vendor Intelligence */}
+                            {type === 'vendor' && (
+                                <div className="mb-2 text-xs">
+                                    <span className="text-gray-400">Customer: </span>
+                                    <span className="font-bold text-slate-800 dark:text-white">{order.customerName}</span>
+                                </div>
+                            )}
+
+                             {/* NEW: Show Vendor Name here if looking at Customer Dossier */}
+                             {type === 'customer' && (
+                                <div className="mb-2 text-xs">
+                                    <span className="text-gray-400">Vendor ID: </span>
+                                    <span className="font-bold text-slate-800 dark:text-white">{order.vendorId?.slice(0,5)}...</span>
+                                </div>
+                            )}
+                            
+                            <div className="flex justify-between items-end border-t border-gray-100 dark:border-white/5 pt-2 mt-2">
                                 <div>
-                                    <p className="text-sm font-bold dark:text-gray-300">{order.items.length} Items</p>
-                                    <p className="text-xs text-gray-500 truncate w-48">{order.items.map(i => i.name).join(", ")}</p>
+                                    <p className="text-sm font-bold dark:text-gray-300">{order.items?.length || 0} Items</p>
+                                    <p className="text-xs text-gray-500 truncate w-48">{order.items?.map(i => i.name).join(", ")}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-lg font-bold text-slate-900 dark:text-white">₹{order.totalAmount.toLocaleString()}</p>
-                                    {type === 'vendor' && <p className="text-[10px] text-emerald-500 font-bold">Comm: ₹{(order.totalAmount * 0.05).toFixed(0)}</p>}
                                 </div>
                             </div>
                         </div>
@@ -126,7 +142,7 @@ const AdminOrders = () => {
   // Drill Down State
   const [lifecycleView, setLifecycleView] = useState(null); // { type: 'vendor'|'customer', id: string, name: string }
 
-  // Global Dashboard Stats (Derived from loaded orders)
+  // Global Dashboard Stats
   const [stats, setStats] = useState({
     totalProcessed: 0,
     acceptedValue: 0,
@@ -135,17 +151,38 @@ const AdminOrders = () => {
     commissionEarned: 0
   });
 
+  // Helper to fetch vendor name
+  const getVendorName = async (vendorId) => {
+    try {
+        const docRef = doc(db, "users", vendorId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.businessName || data.name || "Vendor";
+        }
+    } catch (e) { console.error(e); }
+    return "Unknown Vendor";
+  };
+
   const fetchOrders = async (isNextPage = false) => {
     setLoading(true);
     try {
-      let q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(50)); // Load 50 for better stats
+      let q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(50));
       if (isNextPage && lastDoc) {
         q = query(collection(db, "orders"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(50));
       }
 
       const snapshot = await getDocs(q);
       if (!snapshot.empty) {
-        const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const orderPromises = snapshot.docs.map(async (docSnap) => {
+            const orderData = docSnap.data();
+            // Fetch Vendor Name for each order
+            const vendorName = await getVendorName(orderData.vendorId);
+            return { id: docSnap.id, ...orderData, vendorName };
+        });
+
+        const newOrders = await Promise.all(orderPromises);
+        
         setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
         
         const updatedList = isNextPage ? [...orders, ...newOrders] : newOrders;
@@ -177,7 +214,8 @@ const AdminOrders = () => {
 
   const filteredOrders = orders.filter(order => 
     order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+    order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.vendorName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -188,26 +226,22 @@ const AdminOrders = () => {
          <h1 className="text-3xl font-serif font-bold text-slate-900 dark:text-white mb-6">Financial Intelligence</h1>
          
          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            
-            {/* Accepted (Real Revenue) */}
             <div className="glass-panel p-6 rounded-2xl border-l-4 border-green-500 flex flex-col justify-between">
                 <div>
                     <p className="text-xs font-bold text-gray-500 uppercase mb-1">Realized GMV (Accepted)</p>
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">₹{stats.acceptedValue.toLocaleString()}</h2>
                 </div>
                 <div className="mt-4 w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700">
-                    <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${(stats.acceptedValue / stats.totalProcessed) * 100}%` }}></div>
+                    <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${(stats.acceptedValue / (stats.totalProcessed || 1)) * 100}%` }}></div>
                 </div>
             </div>
 
-            {/* Commission (Your Cut) */}
             <div className="glass-panel p-6 rounded-2xl border-l-4 border-emerald-500 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-900/10 dark:to-surface">
                 <p className="text-xs font-bold text-emerald-600 uppercase mb-1">Projected Commission</p>
                 <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">₹{stats.commissionEarned.toLocaleString()}</h2>
                 <p className="text-[10px] text-gray-400 mt-2">Based on 5% take rate</p>
             </div>
 
-            {/* Pending (Pipeline) */}
             <div className="glass-panel p-6 rounded-2xl border-l-4 border-yellow-400">
                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Pipeline (Pending)</p>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">₹{stats.pendingValue.toLocaleString()}</h2>
@@ -216,7 +250,6 @@ const AdminOrders = () => {
                 </div>
             </div>
 
-            {/* Rejected (Lost) */}
             <div className="glass-panel p-6 rounded-2xl border-l-4 border-red-500 opacity-80 hover:opacity-100 transition">
                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Lost Volume (Rejected)</p>
                 <h2 className="text-2xl font-bold text-red-500">₹{stats.rejectedValue.toLocaleString()}</h2>
@@ -235,10 +268,10 @@ const AdminOrders = () => {
             <div className="relative">
                 <input 
                     type="text" 
-                    placeholder="Search Logs..."
+                    placeholder="Search Vendor, Customer..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 pr-4 py-2 text-sm rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 outline-none focus:border-primary"
+                    className="pl-8 pr-4 py-2 text-sm rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 outline-none focus:border-primary w-64"
                 />
                 <i className="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
             </div>
@@ -270,14 +303,14 @@ const AdminOrders = () => {
                             {/* Vendor (Clickable) */}
                             <td className="px-4 py-3">
                                 <button 
-                                    onClick={() => setLifecycleView({ type: 'vendor', id: order.vendorId, name: 'Vendor ' + order.vendorId.slice(0,5) })}
-                                    className="flex items-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 px-2 py-1 rounded-md -ml-2 transition cursor-pointer"
+                                    onClick={() => setLifecycleView({ type: 'vendor', id: order.vendorId, name: order.vendorName })}
+                                    className="flex items-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 px-2 py-1 rounded-md -ml-2 transition cursor-pointer text-left w-full"
                                 >
-                                    <div className="w-6 h-6 rounded bg-purple-100 text-purple-600 flex items-center justify-center text-xs">
+                                    <div className="w-8 h-8 rounded bg-purple-100 text-purple-600 flex items-center justify-center text-xs shrink-0">
                                         <i className="fas fa-store"></i>
                                     </div>
-                                    <div className="text-left">
-                                        <div className="text-xs font-bold text-purple-700 dark:text-purple-400">Vendor ID: {order.vendorId.slice(0,5)}</div>
+                                    <div className="overflow-hidden">
+                                        <div className="text-xs font-bold text-purple-700 dark:text-purple-400 truncate">{order.vendorName}</div>
                                         <div className="text-[10px] text-gray-400">View Lifecycle &rarr;</div>
                                     </div>
                                 </button>
@@ -287,13 +320,13 @@ const AdminOrders = () => {
                             <td className="px-4 py-3">
                                 <button 
                                     onClick={() => setLifecycleView({ type: 'customer', id: order.customerName, name: order.customerName })}
-                                    className="flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 px-2 py-1 rounded-md -ml-2 transition cursor-pointer"
+                                    className="flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 px-2 py-1 rounded-md -ml-2 transition cursor-pointer text-left w-full"
                                 >
-                                    <div className="w-6 h-6 rounded bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
+                                    <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center text-xs shrink-0">
                                         <i className="fas fa-user"></i>
                                     </div>
-                                    <div className="text-left">
-                                        <div className="text-xs font-bold text-slate-800 dark:text-white">{order.customerName}</div>
+                                    <div className="overflow-hidden">
+                                        <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{order.customerName}</div>
                                         <div className="text-[10px] text-gray-400">View History &rarr;</div>
                                     </div>
                                 </button>

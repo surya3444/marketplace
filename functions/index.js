@@ -1,6 +1,9 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const twilio = require("twilio");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { getAuth } = require("firebase-admin/auth");
+
 
 // 1. Credentials from .env
 const accountSid = process.env.TWILIO_SID;
@@ -50,4 +53,25 @@ exports.sendVendorWelcome = onDocumentCreated("users/{userId}", async (event) =>
     }
   }
   return null;
+});
+
+exports.updateUserPassword = onCall(async (request) => {
+  // 1. Get data from the client
+  const { uid, newPassword } = request.data;
+
+  if (!uid || !newPassword) {
+    throw new HttpsError('invalid-argument', 'The function must be called with a uid and newPassword.');
+  }
+
+  try {
+    // 2. Use Admin SDK to update the Auth user
+    await getAuth().updateUser(uid, {
+      password: newPassword,
+    });
+
+    return { message: "Password updated successfully" };
+  } catch (error) {
+    console.error("Error updating password:", error);
+    throw new HttpsError('internal', error.message);
+  }
 });

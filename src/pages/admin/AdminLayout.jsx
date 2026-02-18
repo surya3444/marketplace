@@ -28,7 +28,7 @@ const AdminLayout = () => {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary/30">
             <i className="fas fa-shield-alt"></i>
           </div>
-          <h2 className="font-serif font-bold text-xl tracking-wide text-slate-900 dark:text-white">Admin Panel</h2>
+          <h2 className="font-serif font-bold text-xl tracking-wide text-slate-900 dark:text-white">Marketplace Admin</h2>
         </div>
 
         <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">

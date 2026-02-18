@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db, storage } from "../../firebase";
+import { db, storage, auth } from "../../firebase"; // Import auth
 import { 
   collection, 
   query, 
@@ -17,6 +17,7 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from "firebase/storage";
+import { sendPasswordResetEmail } from "firebase/auth"; // Import this
 
 const VendorList = () => {
   const [vendors, setVendors] = useState([]);
@@ -54,10 +55,6 @@ const VendorList = () => {
       // 1. Delete from Firestore
       await deleteDoc(doc(db, "users", vendorId));
       
-      // Note: Ideally you should also delete the folder in Storage, 
-      // but client-side folder deletion isn't directly supported in Firebase Storage SDK easily.
-      // Usually, you leave the files or use a Cloud Function to clean up.
-      
       alert("Vendor deleted successfully.");
       fetchVendors();
     } catch (error) {
@@ -71,8 +68,6 @@ const VendorList = () => {
     if (!window.confirm(`Are you sure you want to delete ${fileName}?`)) return;
 
     try {
-      // Create a reference to the file to delete
-      // Note: We try to recreate the ref based on structure, or use refFromURL if needed
       const storageRef = ref(storage, `vendors/${vendorId}/documents/${fileName}`);
       
       try {
@@ -82,8 +77,6 @@ const VendorList = () => {
       }
 
       const vendorRef = doc(db, "users", vendorId);
-      // We need to reconstruct the exact object to remove it from the array
-      // Since Firestore arrayRemove requires the EXACT object match
       const vendor = vendors.find(v => v.id === vendorId);
       const docToRemove = vendor.documents.find(d => d.name === fileName);
 
@@ -94,13 +87,12 @@ const VendorList = () => {
       }
 
       alert("Document deleted.");
-      // Update local state immediately to reflect change in UI without full reload
       const updatedVendor = {
         ...editingVendor,
         documents: editingVendor.documents.filter(d => d.name !== fileName)
       };
-      setEditingVendor(updatedVendor); // Update modal
-      fetchVendors(); // Update list
+      setEditingVendor(updatedVendor); 
+      fetchVendors(); 
     } catch (error) {
       console.error("Error deleting doc:", error);
       alert("Failed to delete document.");
@@ -116,11 +108,9 @@ const VendorList = () => {
       const fileName = uploadFile.name;
       const storageRef = ref(storage, `vendors/${editingVendor.id}/documents/${fileName}`);
 
-      // 1. Upload to Storage
       await uploadBytes(storageRef, uploadFile);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // 2. Add to Firestore Array
       const newDocObject = { name: fileName, url: downloadURL };
       const vendorRef = doc(db, "users", editingVendor.id);
       
@@ -128,18 +118,16 @@ const VendorList = () => {
         documents: arrayUnion(newDocObject)
       });
 
-      // 3. Update UI
       alert("File uploaded successfully!");
-      setUploadFile(null); // Clear input
+      setUploadFile(null); 
       
-      // Update the modal view immediately
       const currentDocs = editingVendor.documents || [];
       setEditingVendor({
         ...editingVendor,
         documents: [...currentDocs, newDocObject]
       });
       
-      fetchVendors(); // Refresh background data
+      fetchVendors(); 
 
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -155,6 +143,7 @@ const VendorList = () => {
     try {
       const vendorRef = doc(db, "users", editingVendor.id);
       
+      // Update Firestore Data
       await updateDoc(vendorRef, {
         businessName: editingVendor.businessName,
         gstNo: editingVendor.gstNo,
@@ -168,11 +157,28 @@ const VendorList = () => {
         status: editingVendor.status
       });
 
+      // --- PASSWORD HANDLING ---
       if (newPassword) {
-         alert("Note: Password field updated in DB, but Auth requires Cloud Function.");
+         // Option A: Send Reset Email (No backend needed)
+         try {
+            await sendPasswordResetEmail(auth, editingVendor.email);
+            alert("Vendor details updated. A password reset email has been sent to " + editingVendor.email);
+         } catch (err) {
+            console.error(err);
+            alert("Updated details, but failed to send reset email: " + err.message);
+         }
+         
+         // Option B: Call Cloud Function (If you deployed one)
+         /*
+         const functions = getFunctions();
+         const updatePassword = httpsCallable(functions, 'updateUserPassword');
+         await updatePassword({ uid: editingVendor.id, newPassword: newPassword });
+         alert("Password updated!");
+         */
+      } else {
+         alert("Vendor details updated successfully!");
       }
 
-      alert("Vendor details updated successfully!");
       setEditingVendor(null);
       setNewPassword(""); 
       fetchVendors();
@@ -185,7 +191,7 @@ const VendorList = () => {
   const handleEditClick = (vendor) => {
       setEditingVendor(vendor);
       setNewPassword("");
-      setUploadFile(null); // Reset upload state
+      setUploadFile(null); 
   };
 
   if (loading) return <div className="p-10 text-white">Loading Vendors...</div>;
@@ -226,7 +232,6 @@ const VendorList = () => {
                   >
                     Manage
                   </button>
-                  {/* NEW: Delete Button */}
                   <button 
                     onClick={() => handleDeleteVendor(vendor.id, vendor.businessName)}
                     className="text-red-500 hover:text-red-700"
@@ -262,7 +267,6 @@ const VendorList = () => {
               <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/5">
                 <h3 className="text-sm font-bold text-primary uppercase mb-4 tracking-wider">Business Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* ... Existing Inputs (No changes here) ... */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Business Name</label>
                         <input 
@@ -333,12 +337,14 @@ const VendorList = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-red-500 mb-1">Reset Password</label>
+                        <label className="block text-xs font-bold text-red-500 mb-1">
+                            Reset Password <span className="text-[10px] font-normal text-gray-500">(Type anything to trigger reset email)</span>
+                        </label>
                         <input 
                             type="text"
                             value={newPassword} 
                             onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="Enter new to reset"
+                            placeholder="Type here to send reset email..."
                             className="w-full bg-white dark:bg-black/20 border border-red-200 dark:border-red-900/30 rounded p-2 dark:text-white placeholder-gray-400"
                         />
                     </div>
@@ -380,7 +386,7 @@ const VendorList = () => {
                 </div>
               </div>
 
-              {/* SECTION 4: Documents (UPDATED) */}
+              {/* SECTION 4: Documents */}
               <div>
                 <h3 className="text-lg font-bold text-primary mb-3">Documents</h3>
                 
@@ -412,7 +418,7 @@ const VendorList = () => {
                   )}
                 </div>
 
-                {/* NEW: Upload Section */}
+                {/* Upload Section */}
                 <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
                   <input 
                     type="file" 

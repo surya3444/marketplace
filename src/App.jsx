@@ -26,6 +26,7 @@ import VendorDashboard from "./pages/vendor/VendorDashboard";
 import AddProduct from "./pages/vendor/AddProduct"; 
 import MyProducts from "./pages/vendor/MyProducts"; 
 import VendorOrders from "./pages/vendor/VendorOrders"; 
+import VendorProfile from "./pages/Vendor/VendorProfile";
 
 // Customer Components
 import CustomerDashboard from "./pages/customer/CustomerDashboard"; // <--- Import
@@ -131,7 +132,7 @@ function App() {
                 <Route path="add-product" element={<AddProduct />} />
                 <Route path="products" element={<MyProducts />} />
                 <Route path="orders" element={<VendorOrders />} />
-                <Route path="profile" element={<div className="p-10 text-white">Vendor Profile Settings...</div>} />
+                <Route path="/vendor/profile" element={<VendorProfile />} />
               </Route>
 
 

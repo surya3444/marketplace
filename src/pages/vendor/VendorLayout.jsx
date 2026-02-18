@@ -1,9 +1,42 @@
+import { useState, useEffect } from "react"; // Import hooks
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { auth } from "../../firebase";
+import { auth, db } from "../../firebase"; // Import db
+import { doc, getDoc } from "firebase/firestore"; // Import Firestore functions
 
 const VendorLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // State to store vendor details
+  const [vendorProfile, setVendorProfile] = useState({
+    businessName: "Vendor Portal",
+    vendorName: ""
+  });
+
+  // Fetch Vendor Data on Mount
+  useEffect(() => {
+    const fetchVendorData = async () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const docRef = doc(db, "users", currentUser.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setVendorProfile({
+              businessName: data.businessName || "Vendor Portal",
+              vendorName: data.vendorName || "Store Owner"
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching vendor profile:", error);
+        }
+      }
+    };
+
+    fetchVendorData();
+  }, []);
 
   const handleLogout = () => {
     auth.signOut();
@@ -13,7 +46,7 @@ const VendorLayout = () => {
   const navItems = [
     { name: "Dashboard", path: "/vendor/dashboard", icon: "fa-chart-line" },
     { name: "My Products", path: "/vendor/products", icon: "fa-box-open" },
-    { name: "Orders", path: "/vendor/orders", icon: "fa-clipboard-list" }, // Blind orders live here
+    { name: "Orders", path: "/vendor/orders", icon: "fa-clipboard-list" }, 
     { name: "My Profile", path: "/vendor/profile", icon: "fa-store" },
   ];
 
@@ -22,12 +55,19 @@ const VendorLayout = () => {
       
       {/* Sidebar */}
       <aside className="w-64 glass-panel border-r border-r-white/20 flex flex-col z-20 h-full">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/30">
+        
+        {/* HEADER: Updated to show Vendor Name */}
+        <div className="p-6 flex items-center gap-3 border-b border-gray-100 dark:border-white/5">
+          <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/30 shrink-0">
             <i className="fas fa-store"></i>
           </div>
-          <div>
-            <h2 className="font-serif font-bold text-lg tracking-wide text-slate-900 dark:text-white leading-tight">Vendor<br/>Portal</h2>
+          <div className="overflow-hidden">
+            <h2 className="font-serif font-bold text-lg tracking-wide text-slate-900 dark:text-white leading-tight truncate">
+                {vendorProfile.businessName}
+            </h2>
+            <p className="text-xs text-gray-500 truncate">
+                Hi, {vendorProfile.vendorName.split(' ')[0]}
+            </p>
           </div>
         </div>
 
