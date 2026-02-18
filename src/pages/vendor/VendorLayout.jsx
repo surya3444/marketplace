@@ -1,19 +1,19 @@
-import { useState, useEffect } from "react"; // Import hooks
+import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { auth, db } from "../../firebase"; // Import db
-import { doc, getDoc } from "firebase/firestore"; // Import Firestore functions
+import { auth, db } from "../../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import logo from "../../assets/logo.png"; // Import your logo
 
 const VendorLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // State to store vendor details
   const [vendorProfile, setVendorProfile] = useState({
     businessName: "Vendor Portal",
-    vendorName: ""
+    vendorName: "",
+    profilePic: "" // Added profilePic to state
   });
 
-  // Fetch Vendor Data on Mount
   useEffect(() => {
     const fetchVendorData = async () => {
       const currentUser = auth.currentUser;
@@ -26,7 +26,8 @@ const VendorLayout = () => {
             const data = docSnap.data();
             setVendorProfile({
               businessName: data.businessName || "Vendor Portal",
-              vendorName: data.vendorName || "Store Owner"
+              vendorName: data.vendorName || "Store Owner",
+              profilePic: data.profilePic || "" // Fetch from Firestore
             });
           }
         } catch (error) {
@@ -54,24 +55,33 @@ const VendorLayout = () => {
     <div className="flex h-screen bg-pearl dark:bg-dark text-slate-900 dark:text-gray-300 transition-colors duration-300 overflow-hidden">
       
       {/* Sidebar */}
-      <aside className="w-64 glass-panel border-r border-r-white/20 flex flex-col z-20 h-full">
+      <aside className="w-64 glass-panel border-r border-r-white/20 flex flex-col z-20 h-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         
-        {/* HEADER: Updated to show Vendor Name */}
+        {/* HEADER: Profile Picture + Name */}
         <div className="p-6 flex items-center gap-3 border-b border-gray-100 dark:border-white/5">
-          <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/30 shrink-0">
-            <i className="fas fa-store"></i>
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-secondary/20 shadow-sm shrink-0 bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+            {vendorProfile.profilePic ? (
+              <img 
+                src={vendorProfile.profilePic} 
+                alt="Profile" 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <i className="fas fa-user text-secondary/50"></i>
+            )}
           </div>
           <div className="overflow-hidden">
-            <h2 className="font-serif font-bold text-lg tracking-wide text-slate-900 dark:text-white leading-tight truncate">
+            <h2 className="font-serif font-bold text-sm tracking-wide text-slate-900 dark:text-white leading-tight truncate">
                 {vendorProfile.businessName}
             </h2>
-            <p className="text-xs text-gray-500 truncate">
-                Hi, {vendorProfile.vendorName.split(' ')[0]}
+            <p className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-tighter">
+                {vendorProfile.vendorName || 'Vendor'}
             </p>
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+        {/* Navigation Items */}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -91,20 +101,32 @@ const VendorLayout = () => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200 dark:border-white/10 mt-auto">
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl w-full transition duration-200 group"
-          >
-            <i className="fas fa-sign-out-alt w-5 text-center group-hover:scale-110 transition-transform"></i>
-            <span className="text-sm font-bold">Logout</span>
-          </button>
+        {/* BOTTOM SECTION: Logout + Branding Logo */}
+        <div className="mt-auto">
+          <div className="px-4 py-2">
+            <button 
+              onClick={handleLogout} 
+              className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl w-full transition duration-200 group"
+            >
+              <i className="fas fa-sign-out-alt w-5 text-center group-hover:scale-110 transition-transform"></i>
+              <span className="text-sm font-bold">Logout</span>
+            </button>
+          </div>
+          
+          {/* BRANDING LOGO */}
+          <div className="p-6 border-t border-gray-100 dark:border-white/5 flex flex-col items-center">
+            <img 
+              src={logo} 
+              alt="Rajchavin Logo" 
+              className="h-10 w-auto opacity-40 hover:opacity-100 transition-opacity grayscale hover:grayscale-0 duration-500" 
+            />
+            <p className="text-[10px] text-gray-400 mt-2 font-bold tracking-widest uppercase">Rajchavin Marketplace</p>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative p-8 scroll-smooth">
-        {/* Background Gradients for visuals */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
         <Outlet />
       </main>
