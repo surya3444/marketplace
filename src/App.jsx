@@ -26,7 +26,7 @@ import VendorDashboard from "./pages/vendor/VendorDashboard";
 import AddProduct from "./pages/vendor/AddProduct"; 
 import MyProducts from "./pages/vendor/MyProducts"; 
 import VendorOrders from "./pages/vendor/VendorOrders"; 
-import VendorProfile from "./pages/Vendor/VendorProfile";
+import VendorProfile from "./pages/vendor/VendorProfile";
 
 // Customer Components
 import CustomerDashboard from "./pages/customer/CustomerDashboard"; // <--- Import
