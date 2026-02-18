@@ -57,7 +57,7 @@ const Footer = () => {
           <ul className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
             <li className="flex items-start gap-3">
               <i className="fas fa-map-marker-alt text-primary mt-1"></i>
-              <span>#391, Basaveshwara Nagar,<br />Gadag, Karnataka</span>
+              <span>RAJCHAVIN REALTY RETREAT LLP Shop No. 1, Survey No. 391, Tirlapur’s Premise, Basaveshwar Nagar, Shahapur Peth, Opp. Someshwara Temple, Ward No. 15, Gadag – 582101, Karnataka, India</span>
             </li>
             <li className="flex items-center gap-3">
               <i className="fas fa-phone text-primary"></i>

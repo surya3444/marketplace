@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import { db, storage } from "../../firebase";
-import { collection, addDoc, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, serverTimestamp, query, where } from "firebase/firestore"; // Added query, where
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { AuthContext } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -12,9 +12,13 @@ const AddProduct = () => {
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
-  const [categories, setCategories] = useState([]); // Store fetched categories
-  const [customUnit, setCustomUnit] = useState(""); // Store custom unit input
+  const [categories, setCategories] = useState([]); 
   
+  // Custom Unit Logic
+  const [customUnit, setCustomUnit] = useState(""); 
+  const [standardUnits, setStandardUnits] = useState(["Piece", "Bag", "Trip", "Kg", "Ton", "Sq. Ft"]);
+  const [vendorCustomUnits, setVendorCustomUnits] = useState([]); // Store fetched custom units
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -24,32 +28,55 @@ const AddProduct = () => {
     stock: "Available"
   });
 
-  // 1. Fetch Categories on Load
+  // 1. Fetch Categories & Vendor's Previous Units
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "categories"));
-        const cats = querySnapshot.docs.map(doc => doc.data().name);
+        // A. Fetch Categories
+        const catSnap = await getDocs(collection(db, "categories"));
+        const cats = catSnap.docs.map(doc => doc.data().name);
         setCategories(cats);
-        // Set default category if available
         if (cats.length > 0) setFormData(prev => ({ ...prev, category: cats[0] }));
+
+        // B. Fetch Vendor's Used Units
+        if (user?.uid) {
+            const q = query(collection(db, "products"), where("vendorId", "==", user.uid));
+            const productSnap = await getDocs(q);
+            
+            const usedUnits = new Set();
+            productSnap.docs.forEach(doc => {
+                const u = doc.data().unit;
+                // If it's not a standard unit, add to custom list
+                if (u && !standardUnits.includes(u)) {
+                    usedUnits.add(u);
+                }
+            });
+            setVendorCustomUnits(Array.from(usedUnits));
+        }
+
       } catch (error) {
-        console.error("Error fetching categories:", error);
+        console.error("Error fetching data:", error);
       }
     };
-    fetchCategories();
-  }, []);
+    fetchData();
+  }, [user, standardUnits]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "description" && value.length > 500) return;
-    setFormData({ ...formData, [name]: value });
+    
+    // If user selects a previously used custom unit, handle it
+    if (name === "unit" && vendorCustomUnits.includes(value)) {
+        setFormData({ ...formData, unit: value }); // Set it directly
+        setCustomUnit(""); // Clear manual input
+    } else {
+        setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleImageChange = (e) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
-      // Validate Size (15MB)
       const validFiles = selectedFiles.filter(file => file.size <= 15 * 1024 * 1024);
       setImages([...images, ...validFiles]);
       const newPreviews = validFiles.map(file => URL.createObjectURL(file));
@@ -72,8 +99,14 @@ const AddProduct = () => {
     setLoading(true);
 
     try {
-      // Handle Custom Unit Logic
+      // Resolve Unit: If "Custom" is selected, use the input box. Otherwise use dropdown value.
       const finalUnit = formData.unit === "Custom" ? customUnit : formData.unit;
+
+      if (!finalUnit) {
+          alert("Please specify a unit.");
+          setLoading(false);
+          return;
+      }
 
       // Upload Images
       const imageUrls = [];
@@ -88,7 +121,7 @@ const AddProduct = () => {
       await addDoc(collection(db, "products"), {
         vendorId: user.uid,
         ...formData,
-        unit: finalUnit, // Use the resolved unit
+        unit: finalUnit, 
         price: parseFloat(formData.price),
         images: imageUrls,
         createdAt: serverTimestamp(),
@@ -128,7 +161,7 @@ const AddProduct = () => {
               />
             </div>
 
-            {/* Category Dropdown (From Admin) */}
+            {/* Category Dropdown */}
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Category</label>
               <div className="relative">
@@ -174,13 +207,22 @@ const AddProduct = () => {
                     onChange={handleChange} 
                     className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-secondary transition dark:text-white appearance-none cursor-pointer"
                 >
-                    <option value="Piece">Per Piece</option>
-                    <option value="Bag">Per Bag</option>
-                    <option value="Trip">Per Trip</option>
-                    <option value="Kg">Per Kg</option>
-                    <option value="Ton">Per Ton</option>
-                    <option value="Sq. Ft">Per Sq. Ft</option>
-                    <option value="Custom">Other / Custom...</option>
+                    <optgroup label="Standard Units">
+                        {standardUnits.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                        ))}
+                    </optgroup>
+                    
+                    {/* Render Previous Custom Units if they exist */}
+                    {vendorCustomUnits.length > 0 && (
+                        <optgroup label="My Custom Units">
+                            {vendorCustomUnits.map(unit => (
+                                <option key={unit} value={unit}>{unit}</option>
+                            ))}
+                        </optgroup>
+                    )}
+
+                    <option value="Custom">+ Add New Unit...</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                     <i className="fas fa-chevron-down"></i>
@@ -190,16 +232,22 @@ const AddProduct = () => {
 
             {/* Conditional Custom Unit Input */}
             {formData.unit === "Custom" && (
-                <div className="animate-fade-in">
-                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Enter Custom Unit</label>
-                    <input 
-                        required 
-                        type="text" 
-                        value={customUnit}
-                        onChange={(e) => setCustomUnit(e.target.value)}
-                        className="w-full bg-white dark:bg-white/5 border border-secondary dark:border-secondary rounded-xl px-4 py-3 outline-none focus:border-secondary transition dark:text-white" 
-                        placeholder="e.g. Truckload, Packet, Box" 
-                    />
+                <div className="md:col-span-2 animate-fade-in bg-secondary/5 p-4 rounded-xl border border-secondary/20">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Define New Unit</label>
+                    <div className="flex gap-2">
+                        <input 
+                            required 
+                            type="text" 
+                            value={customUnit}
+                            onChange={(e) => setCustomUnit(e.target.value)}
+                            className="flex-1 bg-white dark:bg-white/5 border border-secondary rounded-xl px-4 py-3 outline-none focus:border-secondary transition dark:text-white" 
+                            placeholder="e.g. Truckload, Packet, Box" 
+                        />
+                        <div className="text-xs text-gray-500 flex items-center max-w-[150px]">
+                            <i className="fas fa-info-circle mr-1"></i>
+                            This will be saved for future use.
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -224,7 +272,7 @@ const AddProduct = () => {
 
           <hr className="border-gray-200 dark:border-white/10" />
 
-          {/* Image Upload */}
+          {/* Image Upload Section (Unchanged) */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">Product Images (Max 15MB each)</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
