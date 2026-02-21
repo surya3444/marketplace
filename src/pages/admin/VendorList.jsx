@@ -137,29 +137,28 @@ const VendorList = () => {
     }
   };
 
-  // 3. Handle Update Vendor Details
+  // 3. Handle Update Vendor Details (FIXED: Added Fallbacks)
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
       const vendorRef = doc(db, "users", editingVendor.id);
       
-      // Update Firestore Data
+      // Update Firestore Data with safe fallback values to prevent "undefined" crashes
       await updateDoc(vendorRef, {
-        businessName: editingVendor.businessName,
-        gstNo: editingVendor.gstNo,
-        businessType: editingVendor.businessType,
-        contactNumber: editingVendor.contactNumber,
-        email: editingVendor.email,
-        address: editingVendor.address,
-        vendorName: editingVendor.vendorName,
-        remarks: editingVendor.remarks,
-        stars: editingVendor.stars,
-        status: editingVendor.status
+        businessName: editingVendor.businessName || "",
+        gstNo: editingVendor.gstNo || "",
+        businessType: editingVendor.businessType || "Construction Materials",
+        contactNumber: editingVendor.contactNumber || "",
+        email: editingVendor.email || "",
+        address: editingVendor.address || "",
+        vendorName: editingVendor.vendorName || "",
+        remarks: editingVendor.remarks || "",
+        stars: editingVendor.stars || 5,
+        status: editingVendor.status || "active"
       });
 
       // --- PASSWORD HANDLING ---
       if (newPassword) {
-         // Option A: Send Reset Email (No backend needed)
          try {
             await sendPasswordResetEmail(auth, editingVendor.email);
             alert("Vendor details updated. A password reset email has been sent to " + editingVendor.email);
@@ -167,14 +166,6 @@ const VendorList = () => {
             console.error(err);
             alert("Updated details, but failed to send reset email: " + err.message);
          }
-         
-         // Option B: Call Cloud Function (If you deployed one)
-         /*
-         const functions = getFunctions();
-         const updatePassword = httpsCallable(functions, 'updateUserPassword');
-         await updatePassword({ uid: editingVendor.id, newPassword: newPassword });
-         alert("Password updated!");
-         */
       } else {
          alert("Vendor details updated successfully!");
       }
@@ -188,8 +179,23 @@ const VendorList = () => {
     }
   };
 
+  // FIXED: Ensure all fields have a default value so React inputs are always controlled
   const handleEditClick = (vendor) => {
-      setEditingVendor(vendor);
+      setEditingVendor({
+        ...vendor,
+        businessName: vendor.businessName || "",
+        gstNo: vendor.gstNo || "",
+        businessType: vendor.businessType || "Construction Materials",
+        contactNumber: vendor.contactNumber || "",
+        email: vendor.email || "",
+        address: vendor.address || "",
+        // Fallback to their customer 'name' if vendorName doesn't exist yet
+        vendorName: vendor.vendorName || vendor.name || "", 
+        remarks: vendor.remarks || "",
+        stars: vendor.stars || 5,
+        status: vendor.status || "active",
+        documents: vendor.documents || []
+      });
       setNewPassword("");
       setUploadFile(null); 
   };
@@ -216,13 +222,13 @@ const VendorList = () => {
           <tbody>
             {vendors.map((vendor) => (
               <tr key={vendor.id} className="border-b border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{vendor.businessName}</td>
-                <td className="px-6 py-4">{vendor.vendorName}</td>
-                <td className="px-6 py-4">{vendor.businessType}</td>
-                <td className="px-6 py-4">{vendor.contactNumber}</td>
+                <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{vendor.businessName || <span className="text-red-400 italic">Needs Update</span>}</td>
+                <td className="px-6 py-4">{vendor.vendorName || vendor.name}</td>
+                <td className="px-6 py-4">{vendor.businessType || "General"}</td>
+                <td className="px-6 py-4">{vendor.contactNumber || "N/A"}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${vendor.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {vendor.status || 'Pending'}
+                    {vendor.status || 'active'}
                   </span>
                 </td>
                 <td className="px-6 py-4 flex gap-3">
@@ -233,7 +239,7 @@ const VendorList = () => {
                     Manage
                   </button>
                   <button 
-                    onClick={() => handleDeleteVendor(vendor.id, vendor.businessName)}
+                    onClick={() => handleDeleteVendor(vendor.id, vendor.businessName || vendor.name)}
                     className="text-red-500 hover:text-red-700"
                     title="Delete Vendor"
                   >
@@ -290,11 +296,11 @@ const VendorList = () => {
                             onChange={(e) => setEditingVendor({...editingVendor, businessType: e.target.value})}
                             className="w-full bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded p-2 dark:text-white"
                         >
-                            <option>Construction Materials</option>
-                            <option>Interiors & Decor</option>
-                            <option>Electronics</option>
-                            <option>Plumbing & Sanitary</option>
-                            <option>Paints & Chemicals</option>
+                            <option value="Construction Materials">Construction Materials</option>
+                            <option value="Interiors & Decor">Interiors & Decor</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Plumbing & Sanitary">Plumbing & Sanitary</option>
+                            <option value="Paints & Chemicals">Paints & Chemicals</option>
                         </select>
                     </div>
                     <div className="md:col-span-3">
@@ -358,7 +364,7 @@ const VendorList = () => {
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Account Status</label>
                         <select 
-                            value={editingVendor.status || 'active'} 
+                            value={editingVendor.status} 
                             onChange={(e) => setEditingVendor({...editingVendor, status: e.target.value})}
                             className="w-full bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded p-2 dark:text-white"
                         >

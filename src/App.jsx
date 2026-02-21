@@ -20,6 +20,7 @@ import CategoryManager from "./pages/admin/CategoryManager";
 import AdminOrders from "./pages/admin/AdminOrders"; // <--- Import
 import AllProducts from "./pages/admin/AllProducts";
 import AdminPromotions from "./pages/admin/AdminPromotions"; // Import the page
+import AdminCustomers from "./pages/Admin/AdminCustomers";
 
 // Vendor Components
 import VendorLayout from "./pages/vendor/VendorLayout";
@@ -120,6 +121,7 @@ function App() {
                 <Route path="categories" element={<CategoryManager />} />
                 <Route path="orders" element={<AdminOrders />} /> {/* <--- Add this */}
                 <Route path="/admin/products" element={<AllProducts />} />
+                <Route path="customers" element={<AdminCustomers />} />
                 <Route path="promotions" element={<AdminPromotions />} />
               </Route>
 

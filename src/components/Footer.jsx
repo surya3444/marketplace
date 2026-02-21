@@ -84,7 +84,7 @@ const Footer = () => {
                
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed max-w-md">
-              Building legacies through a complete real estate ecosystem. We integrate land, legalities, design, and construction to deliver a seamless experience from groundbreaking to handover.
+              Rajchavin Marketplace powers a complete real estate ecosystem — connecting land, legal services, design, construction, and verified vendors through one system, ensuring transparency, coordination, and seamless delivery from planning to handover.
             </p>
             
             {/* Social Icons */}

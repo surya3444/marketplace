@@ -31,44 +31,52 @@ const Cart = () => {
           {/* Left: Cart Items */}
           <div className="flex-1 space-y-4">
             {cart.map((item) => (
-              <div key={item.id} className="glass-panel p-4 rounded-2xl flex gap-4 items-center group transition hover:border-primary/30">
-                {/* Image */}
-                <div className="w-24 h-24 bg-white dark:bg-white/5 rounded-xl overflow-hidden flex-shrink-0">
-                  <img src={item.images?.[0]} alt={item.name} className="w-full h-full object-cover" />
+              <div key={item.id} className="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row gap-4 sm:items-center group transition hover:border-primary/30">
+                
+                {/* Top Section on Mobile: Image + Details */}
+                <div className="flex items-center gap-4 flex-1 w-full">
+                  {/* Image */}
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white dark:bg-white/5 rounded-xl overflow-hidden flex-shrink-0">
+                    <img src={item.images?.[0]} alt={item.name} className="w-full h-full object-cover" />
+                  </div>
+
+                  {/* Details (min-w-0 added to prevent flexbox blowout on truncate) */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg truncate pr-2 sm:pr-4">{item.name}</h3>
+                    <p className="text-xs text-gray-500 mb-1 sm:mb-2">{item.category} • {item.unit}</p>
+                    <div className="font-bold text-primary text-sm sm:text-base">₹ {item.price}</div>
+                  </div>
                 </div>
 
-                {/* Details */}
-                <div className="flex-1">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate pr-4">{item.name}</h3>
-                  <p className="text-xs text-gray-500 mb-2">{item.category} • {item.unit}</p>
-                  <div className="font-bold text-primary">₹ {item.price}</div>
-                </div>
+                {/* Bottom Section on Mobile: Quantity + Remove */}
+                <div className="flex items-center justify-between w-full sm:w-auto border-t sm:border-none pt-3 sm:pt-0 border-gray-100 dark:border-white/10 mt-1 sm:mt-0">
+                  {/* Quantity Controls */}
+                  <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 dark:bg-white/5 rounded-lg p-1">
+                    <button 
+                      onClick={() => updateQty(item.id, item.qty - 1)}
+                      disabled={item.qty <= 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-black/20 hover:bg-gray-200 text-gray-600 disabled:opacity-50 transition"
+                    >
+                      <i className="fas fa-minus text-xs"></i>
+                    </button>
+                    <span className="font-bold text-slate-900 dark:text-white w-6 text-center">{item.qty}</span>
+                    <button 
+                      onClick={() => updateQty(item.id, item.qty + 1)}
+                      className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-black/20 hover:bg-gray-200 text-gray-600 transition"
+                    >
+                      <i className="fas fa-plus text-xs"></i>
+                    </button>
+                  </div>
 
-                {/* Quantity Controls */}
-                <div className="flex items-center gap-3 bg-gray-50 dark:bg-white/5 rounded-lg p-1">
+                  {/* Remove Button */}
                   <button 
-                    onClick={() => updateQty(item.id, item.qty - 1)}
-                    disabled={item.qty <= 1}
-                    className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-black/20 hover:bg-gray-200 text-gray-600 disabled:opacity-50 transition"
+                      onClick={() => removeFromCart(item.id)}
+                      className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-500 hover:text-white transition sm:ml-2"
                   >
-                    <i className="fas fa-minus text-xs"></i>
-                  </button>
-                  <span className="font-bold text-slate-900 dark:text-white w-6 text-center">{item.qty}</span>
-                  <button 
-                    onClick={() => updateQty(item.id, item.qty + 1)}
-                    className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-black/20 hover:bg-gray-200 text-gray-600 transition"
-                  >
-                    <i className="fas fa-plus text-xs"></i>
+                      <i className="fas fa-trash-alt text-sm sm:text-base"></i>
                   </button>
                 </div>
-
-                {/* Remove Button */}
-                <button 
-                    onClick={() => removeFromCart(item.id)}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-500 hover:text-white transition ml-2"
-                >
-                    <i className="fas fa-trash-alt"></i>
-                </button>
+                
               </div>
             ))}
           </div>
@@ -87,7 +95,6 @@ const Cart = () => {
                   <span>Delivery Charges</span>
                   <span className="text-green-500 font-bold">Notifyed By vendor</span>
                 </div>
-                {/* GST Line Removed */}
               </div>
 
               <div className="border-t border-gray-200 dark:border-white/10 pt-4 mb-8">

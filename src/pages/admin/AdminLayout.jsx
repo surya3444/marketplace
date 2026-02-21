@@ -16,6 +16,7 @@ const AdminLayout = () => {
     { name: "All Products", path: "/admin/products", icon: "fa-shopping-cart" }, // <--- Add this
     { name: "Onboard Vendor", path: "/admin/onboard-vendor", icon: "fa-user-plus" },
     { name: "Manage Vendors", path: "/admin/manage-vendors", icon: "fa-users-cog" }, // <--- New Link Added
+    { name: "Customers", path: "/admin/customers", icon: "fa-users" }, // <--- ADD THIS
     { name: "Manage Categories", path: "/admin/categories", icon: "fa-tags" },
     { name: "Promotions", path: "/admin/promotions", icon: "fa-bullhorn" },
   ];
