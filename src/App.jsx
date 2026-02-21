@@ -20,7 +20,7 @@ import CategoryManager from "./pages/admin/CategoryManager";
 import AdminOrders from "./pages/admin/AdminOrders"; // <--- Import
 import AllProducts from "./pages/admin/AllProducts";
 import AdminPromotions from "./pages/admin/AdminPromotions"; // Import the page
-import AdminCustomers from "./pages/Admin/AdminCustomers";
+import AdminCustomers from "./pages/admin/AdminCustomers";
 
 // Vendor Components
 import VendorLayout from "./pages/vendor/VendorLayout";
